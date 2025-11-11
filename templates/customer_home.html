@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}商家列表 - 网上订餐系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    .merchant-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 25px;
+        margin: 25px 0;
+    }
+    .merchant-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        position: relative;
+        overflow: hidden;
+    }
+    .merchant-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(135deg, #3498db, #2980b9);
+    }
+    .merchant-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+    }
+    .merchant-info {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    .merchant-avatar {
+        width: 50px;
+        height: 50px;
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 18px;
+        margin-right: 15px;
+    }
+    .merchant-name {
+        color: #2c3e50;
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    .merchant-description {
+        color: #6c757d;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+    .merchant-details {
+        color: #666;
+        margin: 8px 0;
+        font-size: 14px;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: rgba(255, 255, 255, 0.8);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="appcus_home">
+    <div>
+        <h1 style="color: white; margin-bottom: 30px; font-size: 32px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+            🏪 商家列表
+        </h1>
+        
+        <div class="merchant-grid">
+            <div v-for="merchant in merchants" :key="merchant.id" class="merchant-card">
+                <div class="merchant-info">
+                    <div class="merchant-avatar">
+                        [[ merchant.store_name.charAt(0) ]]
+                    </div>
+                    <div>
+                        <div class="merchant-name">[[ merchant.store_name ]]</div>
+                        <div class="merchant-description">[[ merchant.description ]]</div>
+                    </div>
+                </div>
+                <div class="merchant-details">
+                    <div>📍 [[ merchant.address ]]</div>
+                    <div>📞 [[ merchant.phone ]]</div>
+                </div>
+                <el-button 
+                    type="primary" 
+                    style="width: 100%; margin-top: 15px;" 
+                    @click="viewDishes(merchant.id)"
+                >
+                    🍽️ 查看菜单
+                </el-button>
+            </div>
+        </div>
+        
+        <div v-if="merchants.length === 0" class="empty-state">
+            <el-empty description="暂无商家">
+                <el-button type="primary" @click="loadMerchants">重新加载</el-button>
+            </el-empty>
+        </div>
+    </div>
+</div>
+<script>
+    const {  } = Vue;
+    const { } = ElementPlus;
+
+   const appcus_home =  createApp({
+        delimiters: ['[[', ']]'],
+        setup() {
+            const merchants = ref([]);
+
+            const loadMerchants = async () => {
+                try {
+                    const response = await fetch('/api/merchants/');
+                    const data = await response.json();
+                    merchants.value = data.merchants;
+                } catch (error) {
+                    console.error('加载商家列表错误:', error);
+                    ElMessage.error('加载商家列表失败');
+                }
+            };
+
+            const viewDishes = (merchantId) => {
+                window.location.href = `/customer/merchant/${merchantId}/`;
+            };
+
+            onMounted(() => {
+                loadMerchants();
+            });
+
+            return {
+                merchants,
+                loadMerchants,
+                viewDishes
+            };
+        }
+    }).use(ElementPlus).mount('#appcus_home');
+</script>
+{% endblock %}

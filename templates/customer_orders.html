@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}我的订单 - 网上订餐系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* 状态颜色 */
+.status-pending { background: #fff3cd; color: #856404; }
+.status-confirmed { background: #d1ecf1; color: #0c5460; }
+.status-preparing { background: #cce7ff; color: #004085; }
+.status-ready { background: #fff3cd; color: #856404; }
+.status-completed { background: #d4edda; color: #155724; }
+.status-cancelled { background: #f8d7da; color: #721c24; }
+
+/* 高亮动画 */
+@keyframes highlight {
+    0% { background-color: rgba(255, 255, 255, 0.95); }
+    50% { background-color: rgba(255, 255, 193, 0.95); }
+    100% { background-color: rgba(255, 255, 255, 0.95); }
+}
+
+/* 新订单指示器 */
+.new-update-indicator {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 12px;
+    height: 12px;
+    background: #ff4757;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
+    .order-list {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        margin: 20px 0;
+    }
+    .order-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+    }
+    .order-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    }
+    .order-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f1f3f4;
+    }
+    .order-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    .order-status {
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .order-details {
+        color: #666;
+        margin: 8px 0;
+    }
+    .order-items {
+        margin: 15px 0;
+        padding: 15px;
+        background: rgba(248, 249, 250, 0.5);
+        border-radius: 10px;
+    }
+    .order-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .order-item:last-child {
+        border-bottom: none;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: rgba(255, 255, 255, 0.8);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="app_order">
+    <div>
+        <h1 style="color: white; margin-bottom: 30px; font-size: 32px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+            📋 我的订单
+        </h1>
+        
+        <div class="order-list">
+            <div v-for="order in orders" :key="order.id" class="order-card" :data-order-id="order.id">
+                <div class="order-header">
+                    <div class="order-title">订单 #[[ order.id ]]</div>
+                    <div :class="'order-status status-' + order.status">
+                        [[ order.status_display ]]
+                    </div>
+                </div>
+                
+                <div class="order-details">
+                    <div><strong>商家:</strong> [[ getMerchantName(order.merchant) ]]</div>
+                    <div><strong>总金额:</strong> ¥[[ order.total_amount ]]</div>
+                    <div><strong>下单时间:</strong> [[ order.created_at ]]</div>
+                </div>
+                
+                <div class="order-items">
+                    <div v-for="item in order.items" :key="item.dish_name" class="order-item">
+                        <span>[[ item.dish_name ]] × [[ item.quantity ]]</span>
+                        <span>¥[[ item.price ]]</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div v-if="orders.length === 0" class="empty-state">
+            <el-empty description="暂无订单">
+                <el-button type="primary" @click="navigateTo('/customer/')">去点餐</el-button>
+            </el-empty>
+        </div>
+    </div>
+</div>
+<script>
+    const {  } = Vue;
+    const { } = ElementPlus;
+
+    const app_order = createApp({
+        delimiters: ['[[', ']]'],
+        setup() {
+            const orders = ref([]);
+            const allMerchants = ref([]);
+            const lastOrderStatus = ref({});
+
+            // 添加计算属性来检测状态变化
+            const hasStatusUpdates = computed(() => {
+                return orders.value.some(order => {
+                    const lastStatus = lastOrderStatus.value[order.id];
+                    return lastStatus && lastStatus !== order.status;
+                });
+            });
+
+            const loadOrders = async () => {
+                try {
+                    const ordersResponse = await fetch('/api/orders/');
+                    const ordersData = await ordersResponse.json();
+                    
+                    // 检测状态变化
+                    if (orders.value.length > 0) {
+                        ordersData.orders.forEach(newOrder => {
+                            const oldOrder = orders.value.find(o => o.id === newOrder.id);
+                            if (oldOrder && oldOrder.status !== newOrder.status) {
+                                showStatusUpdateNotification(oldOrder, newOrder);
+                            }
+                        });
+                    }
+                    
+                    // 更新订单状态跟踪
+                    ordersData.orders.forEach(order => {
+                        lastOrderStatus.value[order.id] = order.status;
+                    });
+                    
+                    orders.value = ordersData.orders;
+                    
+                    const merchantsResponse = await fetch('/api/merchants/');
+                    const merchantsData = await merchantsResponse.json();
+                    allMerchants.value = merchantsData.merchants;
+                    
+                } catch (error) {
+                    ElMessage.error('加载订单失败');
+                }
+            };
+            
+            // 显示状态更新通知
+            const showStatusUpdateNotification = (oldOrder, newOrder) => {
+                const statusMessages = {
+                    'pending': '商家已收到订单',
+                    'confirmed': '商家已接单',
+                    'preparing': '商家正在制作中',
+                    'ready': '订单已制作完成',
+                    'completed': '订单已完成',
+                    'cancelled': '订单已取消'
+                };
+                
+                const message = statusMessages[newOrder.status] || '订单状态已更新';
+                const merchantName = getMerchantName(newOrder.merchant);
+                
+                ElNotification({
+                    title: '📦 订单状态更新',
+                    message: `${merchantName}: ${message}`,
+                    type: getNotificationType(newOrder.status),
+                    duration: 6000,
+                    position: 'top-right',
+                    onClick: () => {
+                        // 滚动到对应的订单
+                        const orderElement = document.querySelector(`[data-order-id="${newOrder.id}"]`);
+                        if (orderElement) {
+                            orderElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // 添加高亮效果
+                            orderElement.style.animation = 'highlight 2s ease';
+                        }
+                    }
+                });
+                
+                // 浏览器通知
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification('🍕 订单状态更新', {
+                        body: `${merchantName}: ${message}`,
+                        icon: '/static/images/logo.png'
+                    });
+                }
+            };
+            
+            const getNotificationType = (status) => {
+                const typeMap = {
+                    'confirmed': 'success',
+                    'preparing': 'info',
+                    'ready': 'warning',
+                    'completed': 'success',
+                    'cancelled': 'error'
+                };
+                return typeMap[status] || 'info';
+            };
+            
+            // 请求通知权限
+            const requestNotificationPermission = () => {
+                if ('Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
+            };
+                    
+            const getMerchantName = (merchantId) => {
+              //  console.log('查找商家:', merchantId, '类型:', typeof merchantId);
+                
+                // 如果merchantId是undefined，尝试从订单对象中获取
+                if (merchantId === undefined || merchantId === null) {
+                    return '商家信息缺失';
+                }
+                
+                // 如果merchantId是对象
+                if (typeof merchantId === 'object') {
+                    return merchantId.store_name || '未知商家';
+                }
+                
+                const merchant = allMerchants.value.find(m => m.id === merchantId);
+                return merchant ? merchant.store_name : `未知商家(ID:${merchantId})`;
+            };
+
+            const navigateTo = (path) => {
+                window.location.href = path;
+            };
+
+            onMounted(() => {
+                loadOrders();
+                requestNotificationPermission();
+                
+                // 每15秒自动刷新订单状态
+                setInterval(() => {
+                    loadOrders();
+                }, 15000);
+            });
+
+            return {
+                orders,
+                allMerchants,
+                loadOrders,
+                getMerchantName,
+                navigateTo,
+                hasStatusUpdates
+            };
+        }
+        
+    }).use(ElementPlus).mount('#app_order');
+</script>
+{% endblock %}
