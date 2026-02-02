@@ -137,9 +137,9 @@ def create_initial_data():
         mcd_boss.set_password('password123')
         mcd_boss.save()
         
-        # 创建麦当劳店铺
+        # 创建麦当劳店铺 (北京)
         Shop.objects.get_or_create(merchant=mcd_boss, defaults={
-            'name': '麦当劳 (McDonalds)',
+            'name': '麦当劳 (McDonalds) - 北京三里屯',
             'description': '我就喜欢 (I\'m lovin\' it)',
             'address': '北京市朝阳区三里屯路19号',
             'latitude': 39.935,
@@ -148,6 +148,50 @@ def create_initial_data():
             'image_url': 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&auto=format&fit=crop'
         })
         print("  - 商家: mcd_boss (密码: password123)")
+
+    # 商家: mcd_beijing_new (北京朝阳新店)
+    mcd_bj_new, created = User.objects.get_or_create(username='mcd_beijing_new', defaults={
+        'email': 'mcd_bj_new@example.com',
+        'role': 'merchant'
+    })
+    if created:
+        mcd_bj_new.set_password('password123')
+        mcd_bj_new.save()
+        
+        # 创建麦当劳店铺 (北京朝阳)
+        # 朝阳公园附近: 39.94, 116.48
+        Shop.objects.get_or_create(merchant=mcd_bj_new, defaults={
+            'name': '麦当劳 (McDonalds) - 北京朝阳公园店',
+            'description': '全新形象店，美味升级',
+            'address': '北京市朝阳区朝阳公园路',
+            'latitude': 39.942,
+            'longitude': 116.485,
+            'rating': 4.7,
+            'image_url': 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&auto=format&fit=crop'
+        })
+        print("  - 商家: mcd_beijing_new (密码: password123)")
+
+    # 商家: mcd_ningbo (宁波麦当劳)
+    mcd_ningbo_user, created = User.objects.get_or_create(username='mcd_ningbo', defaults={
+        'email': 'mcd_ningbo@example.com',
+        'role': 'merchant'
+    })
+    if created:
+        mcd_ningbo_user.set_password('password123')
+        mcd_ningbo_user.save()
+        
+        # 创建麦当劳店铺 (宁波镇海)
+        # 镇海大致坐标: 29.95, 121.71
+        Shop.objects.get_or_create(merchant=mcd_ningbo_user, defaults={
+            'name': '麦当劳 (McDonalds) - 宁波镇海店',
+            'description': '宁波镇海旗舰店，24小时营业',
+            'address': '宁波市镇海区骆驼街道',
+            'latitude': 29.955,
+            'longitude': 121.715,
+            'rating': 4.9,
+            'image_url': 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&auto=format&fit=crop'
+        })
+        print("  - 商家: mcd_ningbo (密码: password123)")
 
     # 顾客: custom
     customer, created = User.objects.get_or_create(username='custom', defaults={

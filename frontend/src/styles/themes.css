@@ -1,0 +1,92 @@
+:root {
+  /* Default (Light/White) Theme */
+  --bg-color: #f7f8fa;
+  --bg-image: none;
+  --text-color: #2c3e50;
+  --text-secondary: #606266;
+  --header-bg: rgba(255, 255, 255, 0.85);
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.5);
+  --primary-color: #409EFF;
+  --shadow-color: rgba(0, 0, 0, 0.05);
+  --logo-bg: linear-gradient(135deg, #409EFF, #007bff);
+}
+
+[data-theme='dark'] {
+  --bg-color: #121212;
+  --bg-image: none;
+  --text-color: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --header-bg: rgba(30, 30, 30, 0.85);
+  --card-bg: rgba(40, 40, 40, 0.8);
+  --glass-bg: rgba(0, 0, 0, 0.6);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+  --primary-color: #409EFF;
+  --shadow-color: rgba(0, 0, 0, 0.5);
+  --logo-bg: linear-gradient(135deg, #409EFF, #007bff);
+}
+
+[data-theme='pink'] {
+  --bg-color: #fff0f5;
+  --bg-image: linear-gradient(120deg, #fccb90 0%, #d57eeb 100%);
+  --text-color: #5e2d45;
+  --text-secondary: #8c5a70;
+  --header-bg: rgba(255, 255, 255, 0.6);
+  --card-bg: rgba(255, 255, 255, 0.5);
+  --glass-bg: rgba(255, 255, 255, 0.3);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.4);
+  --primary-color: #eb2f96;
+  --shadow-color: rgba(235, 47, 150, 0.15);
+  --logo-bg: linear-gradient(135deg, #eb2f96, #ffadd2);
+}
+
+[data-theme='blue'] {
+  --bg-color: #e6f7ff;
+  --bg-image: linear-gradient(120deg, #89f7fe 0%, #66a6ff 100%);
+  --text-color: #003a8c;
+  --text-secondary: #096dd9;
+  --header-bg: rgba(255, 255, 255, 0.6);
+  --card-bg: rgba(255, 255, 255, 0.5);
+  --glass-bg: rgba(255, 255, 255, 0.3);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.4);
+  --primary-color: #1890ff;
+  --shadow-color: rgba(24, 144, 255, 0.15);
+  --logo-bg: linear-gradient(135deg, #1890ff, #69c0ff);
+}
+
+/* Common Glassmorphism Utility */
+.glass-effect {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: var(--glass-border);
+  box-shadow: 0 8px 32px 0 var(--shadow-color);
+}
+
+body {
+  background-color: var(--bg-color);
+  background-image: var(--bg-image);
+  background-attachment: fixed;
+  background-size: cover;
+  color: var(--text-color);
+  transition: background 0.3s, color 0.3s;
+}
+
+/* Element Plus Overrides for Themes */
+[data-theme='dark'] .el-card {
+  background-color: var(--card-bg);
+  border-color: var(--glass-border);
+  color: var(--text-color);
+}
+[data-theme='dark'] .el-input__wrapper {
+  background-color: #333;
+}
+[data-theme='pink'] .el-button--primary {
+  background-color: #eb2f96;
+  border-color: #eb2f96;
+}
+[data-theme='blue'] .el-button--primary {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}

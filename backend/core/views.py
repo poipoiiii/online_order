@@ -14,6 +14,8 @@ from .serializers import (
 )
 import math
 
+from django.db.models import Q
+
 class AuthViewSet(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
 
@@ -61,6 +63,11 @@ class ShopViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Shop.objects.all()
         
+        # 搜索过滤
+        search_query = self.request.query_params.get('search')
+        if search_query:
+            queryset = queryset.filter(name__icontains=search_query)
+
         # 距离排序逻辑
         lat = self.request.query_params.get('lat')
         lng = self.request.query_params.get('lng')
@@ -87,8 +94,8 @@ class ShopViewSet(viewsets.ModelViewSet):
                     distance_km = math.sqrt(d_lat**2 + d_lng**2) * 100
                     shop.distance = distance_km
                     
-                    # 过滤超过5公里的商家
-                    if distance_km <= 5:
+                    # 过滤超过20公里的商家 (扩大范围以适应城市级浏览)
+                    if distance_km <= 20:
                         shops.append(shop)
                 
                 shops.sort(key=lambda x: x.distance)
@@ -178,7 +185,13 @@ class OrderViewSet(viewsets.ModelViewSet):
         elif user.role == 'merchant':
             return Order.objects.filter(shop__merchant=user)
         elif user.role == 'rider':
-            return Order.objects.filter(status__in=['cooking', 'delivering', 'accepted'])
+            # 骑手可见：
+            # 1. 待抢单 (cooking/delivering/accepted 且无骑手)
+            # 2. 我接的单 (包括进行中和已完成的 delivered)
+            return Order.objects.filter(
+                Q(status__in=['cooking', 'delivering', 'accepted'], rider__isnull=True) |
+                Q(rider=user)
+            ).distinct()
         elif user.is_staff:
             return Order.objects.all()
         return Order.objects.none()

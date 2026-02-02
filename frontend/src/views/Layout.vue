@@ -35,6 +35,21 @@
               <el-icon><Bicycle /></el-icon> 骑手中心
             </el-button>
 
+            <!-- Theme Switcher -->
+            <el-dropdown @command="handleTheme" trigger="click" class="theme-dropdown">
+              <span class="theme-btn">
+                <el-icon><MagicStick /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="light">⚪ 简约白</el-dropdown-item>
+                  <el-dropdown-item command="dark">⚫ 暗夜黑</el-dropdown-item>
+                  <el-dropdown-item command="pink">🌸 樱花粉</el-dropdown-item>
+                  <el-dropdown-item command="blue">🌊 海洋蓝</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+
             <el-badge :value="cartCount" :hidden="cartCount === 0" class="cart-badge" v-if="authStore.user?.role === 'customer'">
               <div class="cart-btn" @click="$router.push('/cart')">
                 <el-icon><ShoppingCart /></el-icon>
@@ -118,11 +133,24 @@
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import { computed, onMounted, ref } from 'vue'
-import { Food, ShoppingCart, CaretBottom, Shop, Bicycle, List, SwitchButton, User } from '@element-plus/icons-vue'
+import { Food, ShoppingCart, CaretBottom, Shop, Bicycle, List, SwitchButton, User, MagicStick } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const cartCount = ref(0)
+
+// Theme Management
+const currentTheme = ref(localStorage.getItem('theme') || 'light')
+
+const applyTheme = (theme) => {
+  document.documentElement.setAttribute('data-theme', theme)
+  localStorage.setItem('theme', theme)
+  currentTheme.value = theme
+}
+
+const handleTheme = (theme) => {
+  applyTheme(theme)
+}
 
 // 简单的轮询检查购物车数量（实际项目中应使用 Pinia 状态管理购物车）
 const updateCartCount = () => {
@@ -134,6 +162,7 @@ onMounted(() => {
   updateCartCount()
   window.addEventListener('storage', updateCartCount)
   setInterval(updateCartCount, 1000)
+  applyTheme(currentTheme.value) // Apply saved theme
 })
 
 const handleCommand = (cmd) => {
@@ -151,14 +180,21 @@ const handleCommand = (cmd) => {
 <style scoped>
 .app-container {
   min-height: 100vh;
-  background-color: #f7f8fa;
+  background-color: var(--bg-color);
+  background-image: var(--bg-image);
+  background-attachment: fixed;
+  background-size: cover;
   display: flex;
   flex-direction: column;
+  transition: background 0.3s;
 }
 
 .header {
-  background: #ffffff;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+  background: var(--header-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px var(--shadow-color);
+  border-bottom: var(--glass-border);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -167,7 +203,7 @@ const handleCommand = (cmd) => {
 }
 
 .header-content {
-  max-width: 1400px; /* Wider to accommodate sidebars */
+  max-width: 1400px;
   margin: 0 auto;
   height: 100%;
   display: flex;
@@ -207,7 +243,7 @@ const handleCommand = (cmd) => {
 .logo-text {
   font-size: 22px;
   font-weight: 800;
-  color: #2c3e50;
+  color: var(--text-color);
   letter-spacing: 0.5px;
 }
 
@@ -221,6 +257,22 @@ const handleCommand = (cmd) => {
   font-weight: 600;
 }
 
+.theme-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-color);
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px var(--shadow-color);
+}
+.theme-btn:hover { transform: rotate(15deg) scale(1.1); }
+
 .cart-btn {
   display: flex;
   align-items: center;
@@ -228,14 +280,16 @@ const handleCommand = (cmd) => {
   cursor: pointer;
   padding: 8px 16px;
   border-radius: 20px;
-  background: #f0f2f5;
-  color: #606266;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  color: var(--text-color);
   transition: all 0.2s;
+  box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 .cart-btn:hover {
-  background: #e6e8eb;
-  color: #409EFF;
+  background: var(--bg-color);
+  color: var(--primary-color);
 }
 
 .user-info {
@@ -243,19 +297,17 @@ const handleCommand = (cmd) => {
   align-items: center;
   gap: 10px;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--glass-bg);
+  border: var(--glass-border);
   transition: background 0.2s;
-}
-
-.user-info:hover {
-  background: rgba(0,0,0,0.03);
 }
 
 .username {
   font-size: 15px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-color);
 }
 
 .dropdown-icon {
@@ -292,10 +344,13 @@ const handleCommand = (cmd) => {
 
 .ad-card {
   margin-bottom: 20px;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.2s;
+  background: var(--card-bg);
+  border: var(--glass-border);
+  box-shadow: 0 4px 12px var(--shadow-color);
 }
 .ad-card:hover { transform: translateY(-2px); }
 .ad-img { width: 100%; display: block; }
@@ -307,8 +362,9 @@ const handleCommand = (cmd) => {
 }
 
 .footer {
-  background: #fff;
-  border-top: 1px solid #eee;
+  background: var(--header-bg);
+  backdrop-filter: blur(10px);
+  border-top: var(--glass-border);
   padding: 20px 0;
   margin-top: auto;
 }

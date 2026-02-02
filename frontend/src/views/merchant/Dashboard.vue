@@ -53,6 +53,7 @@
       <el-tab-pane label="菜品管理" name="dishes">
         <div class="action-bar">
           <el-button type="primary" icon="Plus" @click="openDishDialog()">新增菜品</el-button>
+          <el-button type="success" icon="Plus" @click="openCategoryDialog()">新增分类</el-button>
         </div>
         
         <el-table :data="dishes" style="width: 100%" v-loading="loading">
@@ -62,6 +63,7 @@
             </template>
           </el-table-column>
           <el-table-column prop="name" label="名称"></el-table-column>
+          <el-table-column prop="category_name" label="分类" width="120"></el-table-column>
           <el-table-column prop="price" label="价格" width="100"></el-table-column>
           <el-table-column prop="stock" label="库存" width="100"></el-table-column>
           <el-table-column label="状态" width="100">
@@ -106,6 +108,19 @@
         <el-form-item label="名称">
           <el-input v-model="dishForm.name"></el-input>
         </el-form-item>
+        <el-form-item label="分类">
+          <el-select v-model="dishForm.category" placeholder="请选择分类" style="width: 100%">
+            <el-option
+              v-for="cat in categories"
+              :key="cat.id"
+              :label="cat.name"
+              :value="cat.id"
+            />
+          </el-select>
+          <div style="margin-top: 5px; font-size: 12px; color: #999;">
+            如果没有合适分类，请先去“新增分类”
+          </div>
+        </el-form-item>
         <el-form-item label="价格">
           <el-input-number v-model="dishForm.price" :min="0" :precision="2"></el-input-number>
         </el-form-item>
@@ -134,6 +149,19 @@
         <el-button type="primary" @click="saveDish">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 分类新增弹窗 -->
+    <el-dialog v-model="categoryDialogVisible" title="新增分类" width="400px">
+      <el-form :model="categoryForm">
+        <el-form-item label="分类名称">
+          <el-input v-model="categoryForm.name"></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="categoryDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveCategory">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -148,6 +176,7 @@ const authStore = useAuthStore()
 const activeTab = ref('orders')
 const orders = ref([])
 const dishes = ref([])
+const categories = ref([]) // 新增分类列表
 const shop = ref(null)
 const loading = ref(false)
 const orderFilter = ref('all')
@@ -155,19 +184,27 @@ const orderFilter = ref('all')
 // Shop Settings Form
 const shopForm = ref({})
 
+// Category Form
+const categoryDialogVisible = ref(false)
+const categoryForm = ref({ name: '' })
+
 // Dish Form
 const dishDialogVisible = ref(false)
 const isEdit = ref(false)
-const dishForm = ref({ name: '', price: 0, stock: 100, description: '', image_url: '', tag: '' })
+const dishForm = ref({ name: '', price: 0, stock: 100, description: '', image_url: '', tag: '', category: null })
 
 onMounted(() => {
   fetchOrders()
   fetchShopInfo()
+  fetchCategories() // 页面加载时获取分类
 })
 
 const handleTabChange = (tab) => {
   if (tab === 'orders') fetchOrders()
-  if (tab === 'dishes') fetchDishes()
+  if (tab === 'dishes') {
+    fetchDishes()
+    fetchCategories()
+  }
 }
 
 // ----------------- Orders -----------------
@@ -197,22 +234,9 @@ const updateStatus = async (id, status) => {
 
 // ----------------- Shop -----------------
 const fetchShopInfo = async () => {
-  // 假设当前用户只能获取自己的店铺，后端需配合或前端遍历
-  // 简化：获取当前用户的店铺信息，这需要后端 API 支持 "get my shop"
-  // 这里我们假设后端 /api/shops/ 列表里包含了当前商家的店铺，或者我们增加一个 /api/shops/my_shop/ 接口
-  // 由于 ShopViewSet 是 ModelViewSet，我们可以尝试 filter?merchant=current_user_id
-  // 但前端不知道 user_id，从 store 取
   if (authStore.user) {
-    // 临时方案：遍历所有 shops 找到自己的 (不推荐用于生产，但用于演示)
-    // 更好方案：后端增加 `me` 接口
-    // 这里先尝试获取所有，找到自己的
     try {
-      // 实际上后端 ShopViewSet 应该增加 @action(detail=False) def my_shop
-      // 这里暂时用一个假设的接口或逻辑
       const res = await axios.get('/api/shops/')
-      // 假设 authStore.user.username 是唯一的，且我们知道店铺 merchant 用户名
-      // 后端 ShopSerializer 返回了 merchant_id 或者 merchant_username?
-      // 查看 ShopSerializer: merchant 是 ReadOnlyField(source='merchant.username')
       const myShop = res.data.find(s => s.merchant === authStore.user.username)
       if (myShop) {
         shop.value = myShop
@@ -229,6 +253,47 @@ const updateShop = async () => {
     ElMessage.success('店铺信息已更新')
   } catch (e) {
     ElMessage.error('更新失败')
+  }
+}
+
+// ----------------- Categories -----------------
+const fetchCategories = async () => {
+  // 获取当前商家的分类
+  // 由于 CategoryViewSet 没做 merchant 过滤，这里假设它返回所有，我们需要过滤
+  // 或者后端增加 ?shop=my_shop_id。
+  // 暂时先全部获取，如果 shop.value 存在，则过滤
+  try {
+    const res = await axios.get('/api/categories/')
+    if (shop.value) {
+      categories.value = res.data.filter(c => c.shop === shop.value.id)
+    } else {
+      categories.value = res.data
+    }
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const openCategoryDialog = () => {
+  categoryForm.value = { name: '' }
+  categoryDialogVisible.value = true
+}
+
+const saveCategory = async () => {
+  if (!shop.value) {
+    ElMessage.error('无法获取店铺信息，无法添加分类')
+    return
+  }
+  try {
+    await axios.post('/api/categories/', {
+      name: categoryForm.value.name,
+      shop: shop.value.id
+    })
+    ElMessage.success('分类添加成功')
+    categoryDialogVisible.value = false
+    fetchCategories()
+  } catch (e) {
+    ElMessage.error('添加失败')
   }
 }
 
@@ -251,7 +316,7 @@ const openDishDialog = (dish = null) => {
     dishForm.value = { ...dish }
   } else {
     isEdit.value = false
-    dishForm.value = { name: '', price: 0, stock: 100, description: '', image_url: '', tag: '', is_available: true }
+    dishForm.value = { name: '', price: 0, stock: 100, description: '', image_url: '', tag: '', is_available: true, category: null }
   }
   dishDialogVisible.value = true
 }

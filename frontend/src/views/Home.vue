@@ -2,7 +2,7 @@
   <div class="home-container">
     <!-- 顶部搜索与定位栏 -->
     <div class="search-bar-wrapper">
-      <div class="location-picker" @click="chooseLocation">
+      <div class="location-picker" @click="showLocationDialog">
         <el-icon><Location /></el-icon>
         <span class="location-text">{{ currentLocation || '点击定位' }}</span>
         <el-tag size="small" type="info" style="margin-left: 5px">切换</el-tag>
@@ -21,6 +21,55 @@
         </template>
       </el-input>
     </div>
+
+    <!-- 地址选择弹窗 -->
+    <el-dialog v-model="locationDialogVisible" title="选择收货地址" width="500px">
+      <div class="location-options">
+        <div class="current-location-option" @click="handleAutoLocate">
+          <el-icon><Aim /></el-icon>
+          <span>定位到当前位置</span>
+        </div>
+        
+        <!-- 手动输入位置搜索 -->
+        <div style="margin-top: 10px; padding: 0 10px;">
+          <el-input 
+            v-model="manualLocationInput" 
+            placeholder="输入城市或地址（如：北京）" 
+            clearable
+            @keyup.enter="handleManualLocationSearch"
+          >
+            <template #append>
+              <el-button @click="handleManualLocationSearch">确认</el-button>
+            </template>
+          </el-input>
+        </div>
+
+        <el-divider content-position="left">我的收货地址</el-divider>
+        
+        <div v-if="!isLoggedIn" class="login-tip">
+          <el-button type="primary" link @click="$router.push('/login')">登录后可选择收货地址</el-button>
+        </div>
+        
+        <el-empty v-else-if="userAddresses.length === 0" description="暂无收货地址">
+          <el-button type="primary" size="small" @click="$router.push('/profile')">去添加</el-button>
+        </el-empty>
+
+        <div v-else class="address-list">
+          <div 
+            v-for="addr in userAddresses" 
+            :key="addr.id" 
+            class="address-item"
+            @click="selectAddress(addr)"
+          >
+            <div class="addr-info">
+              <div class="addr-text">{{ addr.address }}</div>
+              <div class="addr-contact">{{ addr.name }} {{ addr.phone }}</div>
+            </div>
+            <el-icon v-if="isAddressSelected(addr)" color="#409EFF"><Select /></el-icon>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
 
     <!-- 营销活动区 -->
     <div class="campaign-section">
@@ -91,18 +140,26 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
-import { Shop, StarFilled, Search, Location, LocationInformation } from '@element-plus/icons-vue'
+import { Shop, StarFilled, Search, Location, LocationInformation, Aim, Select } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const shops = ref([])
 const searchQuery = ref('')
 const loading = ref(false)
 const currentLocation = ref('')
 const coords = ref(null)
+
+// Location Dialog
+const locationDialogVisible = ref(false)
+const userAddresses = ref([])
+const isLoggedIn = computed(() => !!authStore.token)
+const manualLocationInput = ref('')
 
 onMounted(() => {
   // 1. 尝试从 LocalStorage 读取已保存的定位信息
@@ -222,30 +279,97 @@ const formatDistance = (val) => {
   return `${val.toFixed(1)}km`
 }
 
-const chooseLocation = () => {
-  const input = prompt("请输入经纬度 (格式: lat,lng) 或输入城市名模拟定位:", "")
-  if (input) {
-    if (input.includes(',')) {
-      const [lat, lng] = input.split(',')
-      saveLocation(parseFloat(lat), parseFloat(lng), '自定义位置')
-    } else {
-      // 简单模拟城市坐标
-      const cityMap = {
-        '北京': { lat: 39.9042, lng: 116.4074 },
-        '上海': { lat: 31.2304, lng: 121.4737 },
-        '广州': { lat: 23.1291, lng: 113.2644 },
-        '深圳': { lat: 22.5431, lng: 114.0579 },
-        '成都': { lat: 30.5728, lng: 104.0668 },
-        '杭州': { lat: 30.2741, lng: 120.1551 }
-      }
-      const cityCoords = cityMap[input]
-      if (cityCoords) {
-        saveLocation(cityCoords.lat, cityCoords.lng, input)
-      } else {
-        ElMessage.error('未知城市，请输入经纬度')
-      }
+const showLocationDialog = async () => {
+  locationDialogVisible.value = true
+  if (isLoggedIn.value) {
+    try {
+      const res = await axios.get('/api/addresses/')
+      userAddresses.value = res.data
+    } catch (e) {
+      console.error('获取地址失败', e)
     }
   }
+}
+
+const handleAutoLocate = () => {
+  getLocation()
+  locationDialogVisible.value = false
+}
+
+const handleManualLocationSearch = () => {
+  const input = manualLocationInput.value.trim()
+  if (!input) return
+  
+  // 简单模拟城市坐标映射（实际应调用地理编码 API）
+  // 为了支持"北京"，我们手动添加常用城市
+  const cityMap = {
+    '北京': { lat: 39.9042, lng: 116.4074 },
+    '北京市': { lat: 39.9042, lng: 116.4074 },
+    '上海': { lat: 31.2304, lng: 121.4737 },
+    '上海市': { lat: 31.2304, lng: 121.4737 },
+    '广州': { lat: 23.1291, lng: 113.2644 },
+    '广州市': { lat: 23.1291, lng: 113.2644 },
+    '深圳': { lat: 22.5431, lng: 114.0579 },
+    '深圳市': { lat: 22.5431, lng: 114.0579 },
+    '宁波': { lat: 29.8683, lng: 121.5440 },
+    '宁波市': { lat: 29.8683, lng: 121.5440 },
+    '镇海': { lat: 29.9550, lng: 121.7150 },
+    '镇海区': { lat: 29.9550, lng: 121.7150 }
+  }
+
+  const cityCoords = cityMap[input]
+  if (cityCoords) {
+    saveLocation(cityCoords.lat, cityCoords.lng, input)
+    locationDialogVisible.value = false
+    ElMessage.success(`已切换至: ${input}`)
+  } else {
+    // 尝试调用百度地图 API 进行解析
+    if (window.BMap && window.BMap.Geocoder) {
+      const myGeo = new window.BMap.Geocoder()
+      myGeo.getPoint(input, function(point) {
+        if (point) {
+           saveLocation(point.lat, point.lng, input)
+           locationDialogVisible.value = false
+           ElMessage.success(`已切换至: ${input}`)
+        } else {
+           ElMessage.warning('无法解析该地址，请尝试输入更详细的城市名')
+        }
+      })
+    } else {
+      ElMessage.warning('未知位置且地图服务未加载，请尝试输入主要城市名')
+    }
+  }
+}
+
+const selectAddress = (addr) => {
+  // Address 模型包含 latitude 和 longitude
+  if (addr.latitude && addr.longitude) {
+    saveLocation(addr.latitude, addr.longitude, addr.address)
+    locationDialogVisible.value = false
+  } else {
+    // 如果没有经纬度（旧数据），可能需要地理编码，或者提示用户
+    // 简单起见，这里假设都有，或者调用后端 geocode (但目前后端 save 时已处理)
+    if (addr.latitude === 0 && addr.longitude === 0) {
+       ElMessage.warning('该地址暂无坐标信息，请编辑后重试')
+       return
+    }
+    // 兼容逻辑
+    saveLocation(addr.latitude || 0, addr.longitude || 0, addr.address)
+    locationDialogVisible.value = false
+  }
+}
+
+const isAddressSelected = (addr) => {
+  if (!coords.value) return false
+  // 简单比较坐标
+  const EPSILON = 0.00001
+  return Math.abs(addr.latitude - coords.value.lat) < EPSILON && 
+         Math.abs(addr.longitude - coords.value.lng) < EPSILON
+}
+
+const chooseLocation = () => {
+  // Deprecated in favor of dialog, but keeping logic for fallback if needed or debug
+  showLocationDialog()
 }
 
 const getShopImage = (shop) => {
@@ -272,7 +396,7 @@ const getShopImage = (shop) => {
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  color: #333;
+  color: var(--text-color);
   font-weight: bold;
   white-space: nowrap;
 }
@@ -287,7 +411,7 @@ const getShopImage = (shop) => {
 }
 
 .campaign-card {
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 12px;
   padding: 16px;
   cursor: pointer;
@@ -298,26 +422,29 @@ const getShopImage = (shop) => {
   justify-content: center;
   position: relative;
   overflow: hidden;
+  border: var(--glass-border);
+  box-shadow: 0 4px 12px var(--shadow-color);
+  backdrop-filter: blur(5px);
 }
 
 .campaign-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 8px 24px var(--shadow-color);
 }
 
-.campaign-card h3 { margin: 0 0 4px 0; font-size: 18px; color: #333; }
-.campaign-card p { margin: 0 0 8px 0; font-size: 12px; color: #999; }
+.campaign-card h3 { margin: 0 0 4px 0; font-size: 18px; color: var(--text-color); }
+.campaign-card p { margin: 0 0 8px 0; font-size: 12px; color: var(--text-secondary); }
 
-.daily-deal { background: linear-gradient(135deg, #ffe6e6 0%, #fff 100%); }
-.flash-sale { background: linear-gradient(135deg, #fff7e6 0%, #fff 100%); }
-.big-brand { background: linear-gradient(135deg, #e6f7ff 0%, #fff 100%); }
+.daily-deal { background: linear-gradient(135deg, rgba(255, 230, 230, 0.8) 0%, rgba(255, 255, 255, 0.8) 100%); }
+.flash-sale { background: linear-gradient(135deg, rgba(255, 247, 230, 0.8) 0%, rgba(255, 255, 255, 0.8) 100%); }
+.big-brand { background: linear-gradient(135deg, rgba(230, 247, 255, 0.8) 0%, rgba(255, 255, 255, 0.8) 100%); }
 
 .section-title {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 24px;
-  color: #303133;
+  color: var(--text-color);
   font-size: 20px;
 }
 
@@ -327,11 +454,15 @@ const getShopImage = (shop) => {
   transition: transform 0.2s, box-shadow 0.2s;
   border: none;
   overflow: hidden;
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(10px);
+  border: var(--glass-border) !important;
+  box-shadow: 0 4px 12px var(--shadow-color) !important;
 }
 
 .shop-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.1) !important;
+  box-shadow: 0 12px 24px var(--shadow-color) !important;
 }
 
 .image-wrapper {
@@ -392,7 +523,7 @@ const getShopImage = (shop) => {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--text-color);
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -410,7 +541,7 @@ const getShopImage = (shop) => {
 }
 
 .shop-desc {
-  color: #909399;
+  color: var(--text-secondary);
   font-size: 13px;
   margin: 0 0 12px 0;
   height: 20px;
@@ -422,5 +553,51 @@ const getShopImage = (shop) => {
 .shop-tags {
   display: flex;
   gap: 6px;
+}
+
+/* Location Dialog Styles */
+.location-options {
+  padding: 10px 0;
+}
+.current-location-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+.current-location-option:hover {
+  background: #f5f7fa;
+}
+.login-tip {
+  text-align: center;
+  padding: 20px;
+}
+.address-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+.address-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.address-item:hover {
+  background: #f5f7fa;
+}
+.addr-text {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.addr-contact {
+  font-size: 12px;
+  color: #999;
 }
 </style>

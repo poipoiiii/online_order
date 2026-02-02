@@ -156,9 +156,8 @@ const fetchOrders = async () => {
 
 // 计算属性区分订单
 const hallOrders = computed(() => {
-  // 待抢订单：状态是 accepted 或 cooking，且没有被分配骑手
-  // 后端 Order 模型 rider 字段：null 表示未分配
-  return orders.value.filter(o => !o.rider && ['accepted', 'cooking'].includes(o.status))
+  // 待抢订单：状态是 accepted, cooking 或 delivering (商家已出餐但未分配骑手)，且没有被分配骑手
+  return orders.value.filter(o => !o.rider && ['accepted', 'cooking', 'delivering'].includes(o.status))
 })
 
 const myOrders = computed(() => {
@@ -167,14 +166,20 @@ const myOrders = computed(() => {
 })
 
 const todayStats = computed(() => {
-  // 简单前端统计
+  // 简单前端统计 (实际应由后端聚合 API 提供)
   const today = new Date().toDateString()
-  const myCompleted = orders.value.filter(o => o.rider === authStore.user.id && o.status === 'delivered')
-  // 注意：fetchOrders 可能只返回了进行中的订单，没返回 delivered 的（看后端 get_queryset）
-  // 后端 get_queryset: status__in=['cooking', 'delivering', 'accepted'] -> 没有 delivered
-  // 所以这里统计不到已完成的。为了统计，后端需要调整。
-  // 暂时显示 0
-  return { count: myCompleted.length, income: myCompleted.length * 5.0 }
+  // 过滤出我完成的订单
+  const myCompleted = orders.value.filter(o => 
+    o.rider === authStore.user.id && 
+    o.status === 'delivered' &&
+    new Date(o.created_at).toDateString() === today // 仅统计今日
+  )
+  
+  // 假设每单配送费 5 元
+  return { 
+    count: myCompleted.length, 
+    income: myCompleted.length * 5.0 
+  }
 })
 
 const grabOrder = async (id) => {

@@ -54,6 +54,7 @@ class DishSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dish
         fields = '__all__'
+        read_only_fields = ['shop']
 
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:

@@ -18,6 +18,30 @@
           </div>
         </div>
         
+        <!-- 地图追踪区域 -->
+        <div v-if="['cooking', 'delivering'].includes(order.status)" class="tracking-section">
+          <el-divider content-position="center">
+            <el-button type="text" @click="toggleMap(order.id)">
+              {{ showMap[order.id] ? '收起地图' : '查看配送进度' }}
+            </el-button>
+          </el-divider>
+          <div v-if="showMap[order.id]" class="map-wrapper">
+             <!-- 
+               假设 order.shop_address (string) 和 order.address_info (object) 包含坐标
+               如果后端没有返回坐标，我们需要在 RiderMap 内部或这里进行地理编码
+               为了演示，我们假设后端 AddressSerializer 和 ShopSerializer 返回了 latitude/longitude
+               如果没返回，RiderMap 内部会需要处理，或者我们只传字符串让 BMap 处理
+               这里我们检查数据结构
+             -->
+             <RiderMap 
+               :shopLocation="{ lat: order.shop_latitude || 39.90, lng: order.shop_longitude || 116.40 }"
+               :userLocation="{ lat: order.address_info?.latitude || 39.91, lng: order.address_info?.longitude || 116.41 }"
+               :riderLocation="riderLocations[order.id]"
+               :status="order.status"
+             />
+          </div>
+        </div>
+
         <div class="order-footer">
           <span class="time">{{ formatDate(order.created_at) }}</span>
           <div class="total">
@@ -51,13 +75,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { ArrowRight } from '@element-plus/icons-vue'
+import RiderMap from '../components/RiderMap.vue'
 
 const orders = ref([])
 const loading = ref(false)
+const showMap = ref({})
+const riderLocations = ref({})
+let riderInterval = null
 
 // Review
 const reviewDialogVisible = ref(false)
@@ -67,16 +95,62 @@ onMounted(() => {
   fetchOrders()
 })
 
+onUnmounted(() => {
+  if (riderInterval) clearInterval(riderInterval)
+})
+
 const fetchOrders = async () => {
   loading.value = true
   try {
     const res = await axios.get('/api/orders/')
     orders.value = res.data
+    // 自动为进行中的订单开启模拟位置更新
+    startRiderSimulation()
   } catch (e) {
     ElMessage.error('获取订单失败')
   } finally {
     loading.value = false
   }
+}
+
+const toggleMap = (orderId) => {
+  showMap.value[orderId] = !showMap.value[orderId]
+}
+
+const startRiderSimulation = () => {
+  if (riderInterval) clearInterval(riderInterval)
+  riderInterval = setInterval(() => {
+    orders.value.forEach(order => {
+      if (['cooking', 'delivering'].includes(order.status)) {
+        // 简单模拟：骑手在店铺和用户之间移动
+        // 如果没有 riderLocations[order.id]，初始化为店铺位置
+        if (!riderLocations.value[order.id]) {
+           riderLocations.value[order.id] = { 
+             lat: order.shop_latitude || 39.90, 
+             lng: order.shop_longitude || 116.40 
+           }
+        }
+        
+        // 移动逻辑：向用户位置靠近
+        const current = riderLocations.value[order.id]
+        const target = { 
+          lat: order.address_info?.latitude || 39.91, 
+          lng: order.address_info?.longitude || 116.41 
+        }
+        
+        const step = 0.0001 // 移动步长
+        const dLat = target.lat - current.lat
+        const dLng = target.lng - current.lng
+        
+        if (Math.abs(dLat) > step || Math.abs(dLng) > step) {
+           riderLocations.value[order.id] = {
+             lat: current.lat + (dLat > 0 ? step : -step) * (Math.random() * 2),
+             lng: current.lng + (dLng > 0 ? step : -step) * (Math.random() * 2)
+           }
+        }
+      }
+    })
+  }, 2000)
 }
 
 const openReviewDialog = (order) => {
