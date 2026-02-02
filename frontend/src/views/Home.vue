@@ -112,7 +112,13 @@
       <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="shop in shops" :key="shop.id">
         <el-card shadow="hover" class="shop-card" :body-style="{ padding: '0px' }" @click="$router.push(`/shop/${shop.id}`)">
           <div class="image-wrapper">
-            <img :src="getShopImage(shop)" class="shop-image" loading="lazy">
+            <img 
+              :src="getShopImage(shop)" 
+              class="shop-image" 
+              loading="lazy"
+              decoding="async"
+              :alt="shop.name"
+            >
             <div class="shop-status" v-if="!shop.is_open">休息中</div>
             <div class="distance-badge" v-if="shop.distance">
               <el-icon><LocationInformation /></el-icon>
@@ -246,6 +252,9 @@ const useNativeLocation = () => {
   }
 }
 
+// 添加缓存机制
+const shopsCache = ref({})
+
 const fetchShops = async () => {
   loading.value = true
   try {
@@ -256,10 +265,35 @@ const fetchShops = async () => {
       params.lat = coords.value.lat
       params.lng = coords.value.lng
     }
+    
+    // 生成缓存键
+    const cacheKey = JSON.stringify(params)
+    
+    // 检查缓存
+    if (shopsCache.value[cacheKey]) {
+      console.log('使用缓存的商家数据')
+      shops.value = shopsCache.value[cacheKey]
+      loading.value = false
+      return
+    }
+    
+    // 发起请求
     const res = await axios.get('/api/shops/', { params })
     shops.value = res.data
+    
+    // 缓存结果
+    shopsCache.value[cacheKey] = res.data
   } catch (e) {
     console.error(e)
+    // 尝试使用缓存数据
+    const cacheKey = JSON.stringify({
+      search: searchQuery.value,
+      lat: coords.value?.lat,
+      lng: coords.value?.lng
+    })
+    if (shopsCache.value[cacheKey]) {
+      shops.value = shopsCache.value[cacheKey]
+    }
   } finally {
     loading.value = false
   }
@@ -384,220 +418,523 @@ const getShopImage = (shop) => {
   padding-bottom: 40px;
 }
 
+/* 搜索栏和定位优化 */
 .search-bar-wrapper {
   display: flex;
   gap: 16px;
   margin-bottom: 24px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .location-picker {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   cursor: pointer;
   color: var(--text-color);
   font-weight: bold;
   white-space: nowrap;
+  padding: 10px 16px;
+  border-radius: 20px;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  box-shadow: 0 2px 8px var(--shadow-color);
+  transition: all 0.2s;
+}
+
+.location-picker:hover {
+  background: var(--bg-color);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .search-input {
   flex: 1;
   max-width: 500px;
+  min-width: 200px;
 }
 
+.search-input .el-input__wrapper {
+  border-radius: 25px !important;
+  box-shadow: 0 2px 8px var(--shadow-color);
+  transition: all 0.2s;
+}
+
+.search-input .el-input__wrapper:hover {
+  box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+.search-input .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 2px var(--primary-color) !important;
+}
+
+/* 营销活动区优化 */
 .campaign-section {
   margin-bottom: 32px;
 }
 
 .campaign-card {
   background: var(--card-bg);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 16px;
+  padding: 20px;
   cursor: pointer;
-  transition: transform 0.2s;
-  height: 100px;
+  transition: all 0.3s;
+  height: 120px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   position: relative;
   overflow: hidden;
   border: var(--glass-border);
-  box-shadow: 0 4px 12px var(--shadow-color);
-  backdrop-filter: blur(5px);
+  box-shadow: 0 4px 16px var(--shadow-color);
+  backdrop-filter: blur(8px);
 }
 
 .campaign-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-4px) scale(1.02);
   box-shadow: 0 8px 24px var(--shadow-color);
 }
 
-.campaign-card h3 { margin: 0 0 4px 0; font-size: 18px; color: var(--text-color); }
-.campaign-card p { margin: 0 0 8px 0; font-size: 12px; color: var(--text-secondary); }
+.campaign-card h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  color: var(--text-color);
+  font-weight: 700;
+  animation: fadeInUp 0.3s ease;
+}
 
-.daily-deal { background: linear-gradient(135deg, rgba(255, 230, 230, 0.8) 0%, rgba(255, 255, 255, 0.8) 100%); }
-.flash-sale { background: linear-gradient(135deg, rgba(255, 247, 230, 0.8) 0%, rgba(255, 255, 255, 0.8) 100%); }
-.big-brand { background: linear-gradient(135deg, rgba(230, 247, 255, 0.8) 0%, rgba(255, 255, 255, 0.8) 100%); }
+.campaign-card p {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  animation: fadeInUp 0.4s ease 0.1s both;
+}
 
+.campaign-card .el-tag {
+  animation: fadeInUp 0.5s ease 0.2s both;
+}
+
+.daily-deal {
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.1) 0%, rgba(255, 255, 255, 0.8) 100%);
+  border-left: 4px solid #f56c6c;
+}
+
+.flash-sale {
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, rgba(255, 255, 255, 0.8) 100%);
+  border-left: 4px solid #e6a23c;
+}
+
+.big-brand {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, rgba(255, 255, 255, 0.8) 100%);
+  border-left: 4px solid #409EFF;
+}
+
+/* 商家列表优化 */
 .section-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 24px;
   color: var(--text-color);
-  font-size: 20px;
+  font-size: 22px;
+  font-weight: 700;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--primary-color);
+  animation: slideInLeft 0.5s ease;
 }
 
 .shop-card {
   margin-bottom: 24px;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: none;
   overflow: hidden;
   background: var(--card-bg) !important;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
   border: var(--glass-border) !important;
-  box-shadow: 0 4px 12px var(--shadow-color) !important;
+  box-shadow: 0 4px 16px var(--shadow-color) !important;
+  border-radius: 16px !important;
 }
 
 .shop-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-6px);
   box-shadow: 0 12px 24px var(--shadow-color) !important;
 }
 
 .image-wrapper {
-  height: 160px;
+  height: 180px;
   overflow: hidden;
   position: relative;
+  border-radius: 16px 16px 0 0;
 }
 
 .shop-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .shop-card:hover .shop-image {
-  transform: scale(1.05);
+  transform: scale(1.1);
 }
 
 .shop-status {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  background: rgba(0,0,0,0.6);
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.7);
   color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 6px 12px;
+  border-radius: 20px;
   font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease;
 }
 
 .distance-badge {
   position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background: rgba(255,255,255,0.9);
+  bottom: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.95);
   color: #333;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
   font-size: 12px;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
+  animation: fadeInUp 0.4s ease 0.1s both;
 }
 
 .card-content {
-  padding: 16px;
+  padding: 20px;
 }
 
 .shop-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .shop-name {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text-color);
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+  animation: fadeInUp 0.3s ease;
 }
 
 .rating {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   color: #ff9900;
   font-weight: bold;
   font-size: 14px;
+  background: rgba(255, 153, 0, 0.1);
+  padding: 4px 8px;
+  border-radius: 12px;
+  animation: fadeInUp 0.4s ease 0.1s both;
 }
 
 .shop-desc {
   color: var(--text-secondary);
-  font-size: 13px;
-  margin: 0 0 12px 0;
-  height: 20px;
+  font-size: 14px;
+  margin: 0 0 16px 0;
+  height: 24px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  animation: fadeInUp 0.4s ease 0.2s both;
 }
 
 .shop-tags {
   display: flex;
-  gap: 6px;
+  gap: 8px;
+  flex-wrap: wrap;
+  animation: fadeInUp 0.4s ease 0.3s both;
 }
 
-/* Location Dialog Styles */
-.location-options {
-  padding: 10px 0;
+.shop-tags .el-tag {
+  border-radius: 12px;
+  font-size: 12px;
+  padding: 2px 8px;
+  transition: all 0.2s;
 }
+
+.shop-tags .el-tag:hover {
+  transform: scale(1.05);
+}
+
+/* 加载状态优化 */
+.loading-state {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.loading-state .el-skeleton {
+  background: var(--glass-bg);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 16px var(--shadow-color);
+}
+
+/* 空状态优化 */
+:deep(.el-empty) {
+  padding: 60px 20px !important;
+}
+
+:deep(.el-empty__image) {
+  width: 120px !important;
+  height: 120px !important;
+}
+
+:deep(.el-empty__description) {
+  font-size: 16px !important;
+  color: var(--text-secondary) !important;
+  margin-top: 20px !important;
+}
+
+:deep(.el-empty__action) {
+  margin-top: 30px !important;
+}
+
+:deep(.el-empty__action .el-button) {
+  border-radius: 20px;
+  padding: 8px 20px;
+  box-shadow: 0 2px 8px var(--shadow-color);
+  transition: all 0.2s;
+}
+
+:deep(.el-empty__action .el-button:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+/* 地址选择弹窗优化 */
+.location-options {
+  padding: 20px 0;
+}
+
 .current-location-option {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  padding: 16px;
   cursor: pointer;
-  border-radius: 8px;
-  transition: background 0.2s;
+  border-radius: 12px;
+  transition: all 0.2s;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  box-shadow: 0 2px 8px var(--shadow-color);
+  margin-bottom: 16px;
 }
+
 .current-location-option:hover {
-  background: #f5f7fa;
+  background: var(--bg-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow-color);
 }
+
 .login-tip {
   text-align: center;
-  padding: 20px;
+  padding: 30px;
+  background: var(--glass-bg);
+  border-radius: 12px;
+  margin: 20px 0;
 }
+
+.login-tip .el-button {
+  border-radius: 20px;
+  padding: 8px 24px;
+  font-weight: 600;
+}
+
 .address-list {
-  max-height: 300px;
+  max-height: 350px;
   overflow-y: auto;
+  margin-top: 16px;
 }
+
 .address-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
+  padding: 16px;
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
+  border-radius: 8px;
+  margin-bottom: 8px;
 }
+
 .address-item:hover {
-  background: #f5f7fa;
+  background: var(--glass-bg);
+  transform: translateX(4px);
 }
+
 .addr-text {
   font-weight: bold;
   font-size: 14px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  color: var(--text-color);
 }
+
 .addr-contact {
   font-size: 12px;
-  color: #999;
+  color: var(--text-secondary);
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 响应式设计优化 */
+@media (max-width: 768px) {
+  .search-bar-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .location-picker {
+    justify-content: center;
+  }
+  
+  .search-input {
+    max-width: none;
+  }
+  
+  .campaign-card {
+    height: 100px;
+    padding: 16px;
+  }
+  
+  .campaign-card h3 {
+    font-size: 18px;
+  }
+  
+  .campaign-card p {
+    font-size: 12px;
+  }
+  
+  .section-title {
+    font-size: 18px;
+    margin-bottom: 20px;
+  }
+  
+  .image-wrapper {
+    height: 150px;
+  }
+  
+  .card-content {
+    padding: 16px;
+  }
+  
+  .shop-name {
+    font-size: 16px;
+  }
+  
+  .location-options {
+    padding: 10px 0;
+  }
+  
+  .current-location-option {
+    padding: 12px;
+  }
+  
+  .address-item {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .campaign-card {
+    height: 90px;
+    padding: 12px;
+  }
+  
+  .campaign-card h3 {
+    font-size: 16px;
+  }
+  
+  .image-wrapper {
+    height: 120px;
+  }
+  
+  .section-title {
+    font-size: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .card-content {
+    padding: 12px;
+  }
+  
+  .shop-name {
+    font-size: 14px;
+  }
 }
 </style>
